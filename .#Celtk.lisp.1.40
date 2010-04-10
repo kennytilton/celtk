@@ -1,0 +1,253 @@
+;; -*- mode: Lisp; Syntax: Common-Lisp; Package: cells; -*-
+#|
+
+    Celtk -- Cells, Tcl, and Tk
+
+Copyright (C) 2006 by Kenneth Tilton
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the Lisp Lesser GNU Public License
+ (http://opensource.franz.com/preamble.html), known as the LLGPL.
+
+This library is distributed  WITHOUT ANY WARRANTY; without even 
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+See the Lisp Lesser GNU Public License for more details.
+
+|#
+
+;;; $Header: /project/cells/cvsroot/Celtk/Celtk.lisp,v 1.40 2007/01/29 22:58:41 ktilton Exp $
+
+(pushnew :tile *features*)
+
+(defpackage :celtk
+  (:nicknames "CTK")
+  (:use :common-lisp :utils-kt :cells :cffi)
+  (:export
+   #:right #:left
+   #:<1> #:tk-event-type #:xsv #:name #:x #:y #:x-root #:y-root
+   #:title$ #:pop-up #:path #:parent-path #:^keyboard-modifiers
+   #:window #:panedwindow #:mk-row #:c?pack-self #:mk-stack #:mk-text-widget #:text-widget
+   #:mk-panedwindow
+   #:mk-stack #:mk-radiobutton #:mk-radiobutton-ex #:mk-radiobutton #:mk-label
+   #:^selection #:selection #:tk-selector
+   #:mk-checkbutton #:button #:mk-button #:mk-button-ex  #:entry #:mk-entry #:text
+   #:frame-stack #:mk-frame-stack #:path #:^path
+   #:mk-menu-entry-radiobutton #:mk-menu-entry-checkbutton
+   #:mk-menu-radio-group #:mk-menu-entry-separator
+   #:mk-menu-entry-command #:mk-menu-entry-command-ex
+   #:menu #:mk-menu #:^menus #:mk-menu-entry-cascade #:mk-menubar
+   #:^entry-values #:tk-eval #:tk-eval-list #:scale #:mk-scale #:mk-popup-menubutton
+   #:item #:polygon #:mk-polygon #:oval #:mk-oval #:line #:mk-line #:arc #:mk-arc
+   #:text-item #:mk-text-item #:item-geometer
+   #:rectangle #:mk-rectangle #:bitmap #:mk-bitmap #:canvas #:mk-canvas #:mk-frame-row
+   #:mk-scrolled-list #:listbox-item #:mk-spinbox
+   #:mk-scroller #:mk-menu-entry-cascade-ex
+   #:with-ltk #:tk-format #:send-wish #:value #:.tkw
+   #:tk-user-queue-handler #:user-errors #:^user-errors
+   #:timer #:timers #:repeat #:executions #:state #:timer-reset #:make-timer-steps
+   #:^widget-menu #:widget-menu #:tk-format-now
+   #:coords #:^coords #:tk-translate-keysym
+   #:*tkw*))
+
+(defpackage :celtk-user
+  (:use :common-lisp :utils-kt :cells :celtk))
+
+(in-package :Celtk)
+
+
+#+(and allegrocl ide (not runtime-system))
+(ide::defdefiner defcallback defun)
+
+(defvar *tki* nil)
+(defparameter *windows-being-destroyed* nil)
+(defparameter *windows-destroyed* nil)
+
+(defparameter *tk-last* nil "Debug aid. Last recorded command send to Tk")
+
+(defparameter *tkw* nil)
+
+(define-symbol-macro .tkw (nearest self window))
+
+; --- tk-format --- talking to wish/Tk -----------------------------------------------------
+
+(defparameter +tk-client-task-priority+
+    '(:delete :forget :destroy 
+       :pre-make-tk :make-tk :make-tk-menubutton :post-make-tk 
+       :variable :bind :selection :trace :configure :grid :pack :fini))
+
+(defun tk-user-queue-sort (task1 task2)
+  "Intended for use as user queue sorter, to make Tk happy by giving it stuff in the order it needs to work properly."
+  (destructuring-bind (type1 self1 &rest dbg) task1
+      (declare (ignorable dbg))
+      (destructuring-bind (type2 self2 &rest dbg) task2
+        (declare (ignorable dbg))
+        (let ((p1 (position type1 +tk-client-task-priority+))
+              (p2 (position type2 +tk-client-task-priority+)))
+          (cond
+           ((< p1 p2) t)
+           ((< p2 p1) nil)
+           (t (case type1 ;; they are the same if we are here
+                (:make-tk
+                 (fm-ordered-p self1 self2))
+                (:pack
+                 (fm-ascendant-p self2 self1)))))))))
+
+
+(defun tk-user-queue-handler (user-q)
+  (loop for (defer-info . nil) in (fifo-data user-q)
+        unless (find (car defer-info) +tk-client-task-priority+)
+        do (error "unknown tk client task type ~a in task: ~a " (car defer-info) defer-info))
+
+  (loop for (defer-info . task) in (prog1
+                                       (stable-sort (fifo-data user-q) 'tk-user-queue-sort :key 'car)
+                                     (fifo-clear user-q))
+        do
+        (trc nil "!!! --- tk-user-queue-handler dispatching" defer-info)
+        (funcall task :user-q defer-info)))
+
+#+save
+(defun tk-format-now (fmt$ &rest fmt-args)
+  (unless (find *tkw* *windows-destroyed*)
+    (let* ((*print-circle* nil)
+           (tk$ (apply 'format nil fmt$ fmt-args)))
+      ;
+      ; --- debug stuff ---------------------------------
+      ;
+
+      (let ((yes '(#+shhh "play-me"))
+            (no  '("font")))
+        (declare (ignorable yes no))
+        (when (and (or ;; (null yes)
+                    (find-if (lambda (s) (search s tk$)) yes))
+                #+hunh? (not (find-if (lambda (s) (search s tk$)) no)))
+          (format t "~&tk> ~a~%" tk$)))
+      (assert *tki*)
+
+      ; --- end debug stuff ------------------------------
+      ;
+      ; --- serious stuff ---
+      ;
+      (setf *tk-last* tk$)
+      (tcl-eval-ex *tki* tk$))))
+
+(defun tk-format-now (fmt$ &rest fmt-args)
+  (unless (find *tkw* *windows-destroyed*)
+    (let* ((*print-circle* nil)
+           (tk$ (apply 'format nil fmt$ fmt-args)))
+      (let ((yes ) ; '("menubar" "cd"))
+            (no  '()))
+        (declare (ignorable yes no))
+        (when (find-if (lambda (s) (search s tk$)) yes)
+          (format t "~&tk> ~a~%" tk$)))
+      (assert *tki*)
+      (setf *tk-last* tk$)
+      (tcl-eval-ex *tki* tk$))))
+
+(defun tk-format (defer-info fmt$ &rest fmt-args)
+  "Format then send to wish (via user queue)"
+  (assert (or (eq defer-info :grouped)
+            (consp defer-info)) () "need defer-info to sort command ~a. Specify :grouped if caller is managing user-queue"
+    (apply 'format nil fmt$ fmt-args))
+
+  (when (eq defer-info :grouped)
+    (setf defer-info nil))
+  (flet ((do-it ()
+           (apply 'tk-format-now fmt$ fmt-args)))
+    (if defer-info
+        (with-integrity (:client defer-info)
+          (do-it))
+    (do-it))))
+
+(defmethod tk-send-value ((s string))
+  #+whoa (if nil #+not (find #\\ s) ;; welllll, we cannot send: -text "[" to Tk because t misinterprets it, so we have to send the octal
+                                                       ; which begins with \. There is probably a better way ///
+      (format nil "\"~a\"" s) ;; no good if \ is in file path as opposed to escaping
+      (format nil "~s" s)                                  ; this fails where I want to send a /Tk/ escape sequence "\065" 
+                                                       ; because the ~s directive adds its own escaping
+  ;;(format nil "{~a}" s)                                ;this fails, too, not sure why
+  )
+  (if (find #\space s)
+      (format nil "{~a}" s)
+    (format nil "~s" s)))
+
+(defmethod tk-send-value ((c character))
+  ;
+  ; all this just to display "[". Unsolved is how we will
+  ; send a text label with a string /containing/ the character #\[
+  ;
+  (trc nil "tk-send-value" c (char-code c) (format nil "\"\\~3,'0o\"" (char-code c)))
+  (format nil "\"\\~3,'0o\"" (char-code c)))
+
+(defmethod tk-send-value (other)
+  (format nil "~a" other))
+
+(defmethod tk-send-value ((s symbol))
+  (down$ s))
+
+(defmethod tk-send-value ((p package))
+  (package-name p))
+
+(defmethod tk-send-value ((values list))
+  (format nil "{~{~a~^ ~}}" (mapcar 'tk-send-value values)))
+
+(defmethod parent-path ((nada null)) "")
+(defmethod parent-path ((other t)) "")
+
+
+; --- tk eval  ----------------------------------------------------
+
+(defmethod path-index (self) (path self))
+
+(defun tk-eval (tk-form$ &rest fmt-args
+                 &aux (tk$ (apply 'format nil tk-form$ fmt-args)))
+  (assert *tki* () "Global *tki* is not bound to anything, let alone a Tcl interpreter")
+  (tk-format :grouped tk$)
+  (tcl-get-string-result *tki*)
+  )
+
+(defun tk-eval-var (var)
+  (tk-eval "set ~a" var))
+
+(defun tk-eval-list (tk-form$ &rest fmt-args)
+  (tk-format :grouped (apply 'format nil tk-form$ fmt-args))
+  (parse-tcl-list-result (tcl-get-string-result *tki*)))
+
+#+test
+(parse-tcl-list-result "-ascent 58 -descent 15 -linespace 73 -fixed 0")
+
+(defun parse-tcl-list-result (result &aux item items)
+  (when (plusp (length result))
+    (trc nil "parse-tcl-list-result" result)
+    (labels ((is-spaces (s)
+               (every (lambda (c) (eql c #\space)) s))
+             (gather-item ()
+               (unless (is-spaces item)
+                 ;(trc "item chars" (reverse item))
+                 ;(trc "item string" (coerce (reverse item) 'string))
+                 (push (coerce (nreverse item) 'string) items)
+                 (setf item nil))))
+      (loop with inside-braces
+          for ch across result
+          if (eql ch #\{)
+          do (if inside-braces
+                 (break "whoa, nested braces: ~a" result)
+               (setf inside-braces t))
+          else if (eql ch #\})
+          do (setf inside-braces nil)
+            (gather-item)
+            (setf item nil)
+          else if (eql ch #\space)
+          if inside-braces do (push ch item)
+          else do (gather-item)
+            (setf item nil)
+          else do (push ch item)
+          finally (gather-item)
+            (return (nreverse items))))))
+        
+
+
+
+
+
+

@@ -1,0 +1,226 @@
+;; -*- mode: Lisp; Syntax: Common-Lisp; Package: cells; -*-
+#|
+
+    Togl Bindings and Cells/Tk Interfaces
+
+Copyright (C) 2006 by Kenneth Tilton
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the Lisp Lesser GNU Public License
+ (http://opensource.franz.com/preamble.html), known as the LLGPL.
+
+This library is distributed  WITHOUT ANY WARRANTY; without even 
+the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+
+See the Lisp Lesser GNU Public License for more details.
+
+|#
+
+(in-package :celtk)
+
+
+(define-foreign-library Togl
+  (:darwin (:or "libTogl1.7.dylib"
+                "/opt/tcltk/togl/lib/Togl1.7/libtogl1.7.dylib"))
+  (:windows (:or "togl17.dll"))
+  (:unix "/usr/lib/Togl1.7/libTogl1.7.so"))
+
+(defctype togl-struct-ptr-type :pointer)
+
+;;; --- Togl (Version 1.7 and above needed!) -----------------------------
+
+(defcfun ("Togl_Init" Togl-Init) tcl-retcode
+  (interp :pointer))
+
+(defcfun ("Togl_PostRedisplay" togl-post-redisplay) :void
+  (togl-struct-ptr :pointer))
+
+(defcfun ("Togl_SwapBuffers" togl-swap-buffers) :void
+  (togl-struct-ptr :pointer))
+
+(defcfun ("Togl_Ident" Togl-Ident) :string
+  (togl-struct-ptr :pointer))
+
+(defcfun ("Togl_Width" Togl-Width) :int
+  (togl-struct-ptr :pointer))
+
+(defcfun ("Togl_Height" Togl-Height) :int
+  (togl-struct-ptr :pointer))
+
+(defcfun ("Togl_Interp" Togl-Interp) :pointer
+  (togl-struct-ptr :pointer))
+
+;; The following functions are not CFFI-translated yet ...
+
+;; Togl_AllocColor
+;; Togl_FreeColor
+
+;; Togl_LoadBitmapFont
+;; Togl_UnloadBitmapFont
+
+;; Togl_SetClientData
+;; Togl_ClientData
+
+;; Togl_UseLayer
+;; Togl_ShowOverlay
+;; Togl_HideOverlay
+;; Togl_PostOverlayRedisplay
+;; Togl_OverlayDisplayFunc
+;; Togl_ExistsOverlay
+;; Togl_GetOverlayTransparentValue
+;; Togl_IsMappedOverlay
+;; Togl_AllocColorOverlay
+;; Togl_FreeColorOverlay
+;; Togl_DumpToEpsFile
+
+(eval-now!
+  (export '(togl with-togl togl-interp togl-swap-buffers togl-post-redisplay togl-ptr togl-reshape-func
+             togl togl-timer-using-class togl-post-redisplay togl-reshape-using-class
+             togl-display-using-class togl-width togl-height togl-create-using-class)))
+
+;; --- gotta call this bad boy during initialization, I guess any time after we have an interpreter
+;;
+
+(defun tk-togl-init (interp)
+  ;(assert (not (zerop (tcl-init-stubs interp "8.1" 0)))) ;; Only meaningful on Windows
+  ;(assert (not (zerop (tk-init-stubs interp "8.1" 0)))) ;; dito
+  (togl-init interp)
+  (togl-create-func (callback togl-create))
+  (togl-destroy-func (callback togl-destroy))
+  (togl-display-func (callback togl-display))
+  (togl-reshape-func (callback togl-reshape))
+  (togl-timer-func (callback togl-timer)) ;; probably want to make this optional
+  )
+
+(export! togl-ptr-set ^togl-ptr-set)
+
+(deftk togl (widget)
+  ((togl-ptr :cell nil  :initform nil :initarg :togl-ptr :accessor togl-ptr)
+   (togl-ptr-set :initform (c-in nil) :initarg :togl-ptr-set :accessor togl-ptr-set
+     :documentation "very complicated, don't ask (togl-ptr cannot wait on ufb processing)")
+   (cb-create :initform nil :initarg :cb-create :reader cb-create)
+   (cb-display :initform nil :initarg :cb-display :reader cb-display)
+   (cb-reshape :initform nil :initarg :cb-reshape :reader cb-reshape)
+   (cb-destroy :initform nil :initarg :cb-destroy :reader cb-destroy)
+   (cb-timer :initform nil :initarg :cb-timer :reader cb-timer))
+  (:tk-spec togl
+    -width ;;		400	Width of widget in pixels.
+    -height ;;		400	Height of widget in pixels.
+    -ident	;;	""	A user identification string ignored by togl.
+    ;;	This can be useful in your C callback functions
+    ;;	to determine which Togl widget is the caller.
+    -rgba	;;	true	If true, use RGB(A) mode
+    ;;	If false, use Color Index mode
+    -redsize      ;;	1	Min bits per red component
+    -greensize	;; 1	Min bits per green component
+    -bluesize	;; 1	Min bits per blue component
+    -double		;; false	If false, request a single buffered window
+    ;; If true, request double buffered window
+    -depth		;; false	If true, request a depth buffer
+    -depthsize	;; 1	Min bits of depth buffer
+    -accum		;; false	If true, request an accumulation buffer
+    -accumredsize	;; 1	Min bits per accum red component
+    -accumgreensize	;; 1	Min bits per accum green component
+    -accumbluesize	;; 1	Min bits per accum blue component
+    -accumalphasize	;; 1	Min bits per accum alpha component
+    -alpha		;; false	If true and -rgba is true, request an alpha
+    ;; channel
+    -alphasize	;; 1	Min bits per alpha component
+    -stencil	;; false	If true, request a stencil buffer
+    -stencilsize	;; 1	Min number of stencil bits
+    -auxbuffers	;; 0	Desired number of auxiliary buffers
+    -privatecmap	;; false	Only applicable in color index mode.
+    ;; If false, use a shared read-only colormap.
+    ;; If true, use a private read/write colormap.
+    -overlay      ;; false   If true, request overlay planes.
+    -stereo       ;; false   If true, request a stereo-capable window.
+    (-timer-interval -time)  ;; 1       Specifies the interval, in milliseconds, for
+    ;     calling the C timer callback function which
+    ;    was registered with Togl_TimerFunc.
+    -sharelist    ;; ""      Name of an existing Togl widget with which to
+    ;     share display lists.
+    ;    NOT YET IMPLEMENTED FOR WINDOWS 95/NT.
+    -sharecontext ;; ""      Name of an existing Togl widget with which to
+    ;     share the OpenGL context.  NOTE:  most other
+    ;    attributes such as double buffering, RGBA vs CI,
+    ;   ancillary buffer specs, etc are then ignored.
+    ;  NOT YET IMPLEMENTED FOR WINDOWS 95/NT.
+    -indirect     ;; false   If present, request an indirect rendering context.
+    ;     A direct rendering context is normally requested.
+    ;    NOT SIGNIFICANT FOR WINDOWS 95/NT.
+    )
+  (:default-initargs
+      :double t
+    :rgba t
+    :alpha t
+    :id (gentemp "TOGL")
+    :ident (c? (^path))))
+
+(defmacro with-togl ((togl-form width-var height-var) &body body &aux (togl (gensym))(togl-ptr (gensym)))
+  `(let* ((,togl ,togl-form)
+          (,togl-ptr (togl-ptr ,togl)))
+     (when ,togl-ptr
+       (let ((*tki* (togl-interp ,togl-ptr))
+             (,width-var (togl-width ,togl-ptr))
+             (,height-var (togl-height ,togl-ptr)))
+         ,@body))))
+
+(defmacro def-togl-callback (root (&optional (ptr-var 'togl-ptr)(self-var 'self)) &body preamble)
+  (let ((register$ (format nil "TOGL-~a-FUNC" root))
+        (cb$ (format nil "TOGL-~a" root))
+        (cb-slot$ (format nil "CB-~a" root))
+        (uc$ (format nil "TOGL-~a-USING-CLASS" root)))
+    `(progn
+       (defcfun (,(format nil "Togl_~:(~a~)Func" root) ,(intern register$))
+           :void
+         (callback :pointer))
+       (defcallback ,(intern cb$) :void ((,ptr-var :pointer))
+         (unless (c-stopped)
+           (bif (,self-var (or (gethash (pointer-address ,ptr-var) (tkwins *tkw*))
+                             (gethash (togl-ident ,ptr-var)(dictionary *tkw*))))
+             (progn
+               ,@preamble
+               (trc nil "selves" ,cb$ (togl-ident ,ptr-var) (gethash (pointer-address ,ptr-var) (tkwins *tkw*))(gethash (togl-ident ,ptr-var)(dictionary *tkw*)))
+               (,(intern uc$) ,self-var))
+             (trc "WARNING: Togl callback ~a sees unknown togl pointer ~a :address ~a :ident ~a"
+               ,cb$ ,ptr-var (pointer-address ,ptr-var) (togl-ident ,ptr-var)))))
+       (defmethod ,(intern uc$) :around ((self togl))
+         (if (,(intern cb-slot$) self)
+               (funcall (,(intern cb-slot$) self) self)
+             (call-next-method)))
+       (defmethod ,(intern uc$) ((self togl))))))
+
+
+
+(def-togl-callback create ()
+  (trc "___________________ TOGL SET UP _________________________________________" togl-ptr )
+  ;;  
+  ;; Cello dependency here: relies on :CELLO being pushed to *features*!
+  ;;
+  ;;(eval-when (:compile-toplevel :execute)
+  ;;  (if (member :cello cl-user::*features*)
+  ;;    (progn
+
+  (when (find-package "CL-FTGL")
+    (set (find-symbol "*FTGL-OGL*" "CL-FTGL") togl-ptr)) ;; help debug failure to use lazy cells/classes  ;; to defer FTGL till Ogl ready
+
+  (when (find-package "KT-OPENGL")
+    (funcall (symbol-function (find-symbol "KT-OPENGL-RESET" "CL-FTGL"))))
+
+  ;;;   ^^^^^ above two needed only for cello ^^^^^^
+  ;;;  
+  (setf (togl-ptr self) togl-ptr) ;; this cannot be deferred
+  (setf (togl-ptr-set self) togl-ptr) ;; this gets deferred, which is OK
+  (setf (gethash (pointer-address togl-ptr) (tkwins *tkw*)) self))
+
+(def-togl-callback display ())
+(def-togl-callback reshape ())
+(def-togl-callback destroy ())
+(def-togl-callback timer ())
+       
+(defmethod make-tk-instance ((self togl))
+  (with-integrity (:client `(:make-tk ,self))
+    (setf (gethash (^path) (dictionary .tkw)) self)
+    (trc nil "making togl!!!!!!!!!!!!" (path self)(tk-configurations self))
+    (tk-format-now "togl ~a ~{~(~a~) ~a~^ ~}"
+      (path self)(tk-configurations self))))
