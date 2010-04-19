@@ -24,7 +24,13 @@ See the Lisp Lesser GNU Public License for more details.
   (:darwin (:or "libTogl1.7.dylib"
                 "/opt/tcltk/togl/lib/Togl1.7/libtogl1.7.dylib"))
   (:windows (:or "togl17.dll"))
-  (:unix "/usr/lib/Togl1.7/libTogl1.7.so"))
+  (:unix "/usr/lib/Togl-1.7/libTogl1.7.so"))
+
+#+test
+(use-foreign-library Togl)
+
+#+test
+(probe-file "/usr/lib/Togl-1.7/libTogl1.7.so")
 
 (defctype togl-struct-ptr-type :pointer)
 
@@ -119,7 +125,7 @@ See the Lisp Lesser GNU Public License for more details.
     ;; If true, request double buffered window
     -depth		;; false	If true, request a depth buffer
     -depthsize	;; 1	Min bits of depth buffer
-    -accum		;; false	If true, request an accumulation buffer
+    (-togl-accum -accum)		;; false	If true, request an accumulation buffer
     -accumredsize	;; 1	Min bits per accum red component
     -accumgreensize	;; 1	Min bits per accum green component
     -accumbluesize	;; 1	Min bits per accum blue component
@@ -154,7 +160,7 @@ See the Lisp Lesser GNU Public License for more details.
       :double t
     :rgba t
     :alpha t
-    :id (gentemp "TOGL")
+    :id (gentemp "togl")
     :ident (c? (^path))))
 
 (defmacro with-togl ((togl-form width-var height-var) &body body &aux (togl (gensym))(togl-ptr (gensym)))

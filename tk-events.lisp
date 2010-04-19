@@ -151,7 +151,7 @@ See the Lisp Lesser GNU Public License for more details.
         do (print `(win ,win :xwin ,(tkwin-window win) ,(tkwin-widget win) ,(path (tkwin-widget win)))))
   ;;(trc "    > same-screen" (xsv same-screen xe))
 
-  (trc "tkep> " (tk-event-type (mem-aref xe :int)) :client-data client-data)
+  ;;(trc "tkep> " (tk-event-type (mem-aref xe :int)) :client-data client-data)
   (case (tk-event-type (mem-aref xe :int))
     (:motionnotify
      (trc nil "motionnotify" (xsv x xe) :y (xsv y xe) :x-root (xsv x-root xe) :y-root (xsv y-root xe)))

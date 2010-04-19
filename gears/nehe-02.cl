@@ -1,11 +1,12 @@
 
 
-(defpackage :nehe-02
-  (:use :common-lisp :utils-kt :cells :celtk))
+(in-package :celtk)
 
-(in-package :nehe-02)
+(eval-when (compile load)
+  (use-package :gl)
+  (use-package :glu))
 
-(defun gears::nehe-02 () ;; ACL project manager needs a zero-argument function, in project package
+(defun nehe-02 () ;; ACL project manager needs a zero-argument function, in project package
   (test-window 'nehe-02-demo))
 
 (defmodel nehe-02-demo (window)
@@ -40,8 +41,8 @@
   )
 
 (defmethod togl-reshape-using-class ((self nehe-02))
-  (let ((width (Togl-width (togl-ptr self)))
-        (height (Togl-height (togl-ptr self))))
+  (let ((width (togl-width (togl-ptr self)))
+        (height (togl-height (togl-ptr self))))
     (trc "reshape w,h" width height)
     (if (zerop height)
         (setq height 1))
@@ -54,10 +55,10 @@
 
 (defmethod togl-display-using-class ((w nehe-02))
   (trc "display")
-  (gl:clear :color-buffer-bit :depth-buffer-bit)
+  (gl:clear #x4000 :DEPTH-BUFFER-BIT)
   (gl:load-identity)
   (gl:clear-color 0 1 0 0)
-  (gl:clear :color-buffer-bit :depth-buffer-bit)
+  (gl:clear #x4000 :DEPTH-BUFFER-BIT)
   ;(gl:translate -1.5 0.0 -6)
   (draw-triangle)
   ;(gl:translate 3.0f0 0.0f0 0.0f0)

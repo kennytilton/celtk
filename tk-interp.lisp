@@ -216,16 +216,10 @@ See the Lisp Lesser GNU Public License for more details.
     ;;#-macosx (use-foreign-library Tile)
     ;;#-macosx (pushnew :tile cl-user::*features*)
     (print :try-using-togl)
-    #+togl (use-foreign-library Togl)
-    #+togl (print :try-using-togl-ok)
+    (use-foreign-library Togl)
+    (print :try-using-togl-ok)
     (tcl-find-executable (argv0))
     (set-initialized)))
-
-#+test
-(load-foreign-library 'Togl)
-
-#+test
-(load "togl17.dll" :verbose t)
 
 ;; Send a script to a given Tcl/Tk interpreter
 

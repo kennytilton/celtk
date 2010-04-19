@@ -107,7 +107,7 @@ See the Lisp Lesser GNU Public License for more details.
                              (setf (^modified) t)))))
                        ))))
 
-(defmethod clear ((self text-widget))
+(defmethod clear-value ((self text-widget))
   (setf (value self) nil))
 
 (defobserver .value ((self text-widget))

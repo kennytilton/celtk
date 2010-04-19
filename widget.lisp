@@ -268,7 +268,7 @@ See the Lisp Lesser GNU Public License for more details.
 
 (defmethod not-to-be :after ((self item))
   (unless (find .tkw *windows-destroyed*)
-    ;(trc "whacking item" self)
+    (trc "whacking item" self)
     (tk-format `(:delete ,self) "~a delete ~a" (path (upper self widget)) (id-no self))))
 
 ;;; --- widget mixins ------------------------------

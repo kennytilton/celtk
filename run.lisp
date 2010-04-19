@@ -44,7 +44,8 @@ See the Lisp Lesser GNU Public License for more details.
   
   ;; not recommended by Tcl doc (tcl-do-when-idle (get-callback 'tcl-idle-proc) 42)
   (tk-app-init *tki*)
-  #+togl (tk-togl-init *tki*)
+  (trace tk-togl-init)
+  (tk-togl-init *tki*)
   (tk-format-now "proc TraceOP {n1 n2 op} {event generate $n1 <<trace>> -data $op}")
   
   #+snack (tk-format-now "package require snack")

@@ -2,17 +2,15 @@
 
 (in-package :cg-user)
 
-(defpackage :CELTK)
+(defpackage :celtk)
 
 (define-project :name :celtk3d
   :modules (list (make-instance 'module :name "cellogears.lisp"))
   :projects (list (make-instance 'project-module :name
                                  "..\\cells\\cells")
-                  (make-instance 'project-module :name
-                                 "C:\\1-devtools\\cffi\\cffi")
-                  (make-instance 'project-module :name
-                                 "C:\\1-devtools\\cl-opengl\\glu")
-                  (make-instance 'project-module :name "CELTK"))
+                  
+                  
+                  (make-instance 'project-module :name "celtk"))
   :libraries nil
   :distributed-files nil
   :internally-loaded-files nil

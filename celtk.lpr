@@ -35,7 +35,9 @@
                  (make-instance 'module :name "lotsa-widgets.lisp")
                  (make-instance 'module :name "demos.lisp")
                  (make-instance 'module :name "andy-expander.lisp")
-                 (make-instance 'module :name "notebook.lisp"))
+                 (make-instance 'module :name "notebook.lisp")
+                 (make-instance 'module :name "gears/nehe-02")
+                 (make-instance 'module :name "gears/gears.lisp"))
   :projects (list (make-instance 'project-module :name "../cells/cells" :show-modules
                                  nil))
   :libraries nil
@@ -102,7 +104,7 @@
   :build-number 0
   :run-with-console nil
   :project-file-version-info nil
-  :on-initialization 'celtk::tk-test
+  :on-initialization 'celtk::gears
   :default-error-handler-for-delivery 'report-unexpected-error-and-exit
   :on-restart 'do-default-restart)
 
