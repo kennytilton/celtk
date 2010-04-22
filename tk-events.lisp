@@ -146,6 +146,7 @@ See the Lisp Lesser GNU Public License for more details.
   (call-dump-event client-data xe))
 
 (defun call-dump-event (client-data xe)
+  (declare (ignorable client-data))
   ;;(trc "tkep> serial" (xsv serial xe))
   #+shh (loop for win being the hash-keys of (tkwins *tkw*)
         do (print `(win ,win :xwin ,(tkwin-window win) ,(tkwin-widget win) ,(path (tkwin-widget win)))))
