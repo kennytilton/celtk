@@ -133,8 +133,8 @@
   )
 
 (defun truc (self &optional truly)
-  (let ((width (Togl-width (togl-ptr self)))
-        (height (Togl-height (togl-ptr self))))
+  (let ((width (togl-width (togl-ptr self)))
+        (height (togl-height (togl-ptr self))))
     (trc nil "enter gear reshape" self width (width self))
     (gl:viewport 0 (- height (height self)) (width self) (height self))
     (unless truly
@@ -152,7 +152,7 @@
   (declare (ignorable scale))
   (trc nil "display angle" (^rotx)(^roty)(^rotz))
   (gl:clear-color 0 0 0 1)
-  (gl:clear :color-buffer-bit :depth-buffer-bit)
+  (gl:clear :COLOR-BUFFER-BIT :DEPTH-BUFFER-BIT)
   
   (gl:with-pushed-matrix
       (gl:rotate (^rotx) 1 0 0)
@@ -174,7 +174,7 @@
       (gl:rotate (- (* -2 (^angle)) 25) 0 0 1)
       (gl:call-list (^gear3))))
   
-  (Togl-Swap-Buffers (togl-ptr self))
+  (togl-swap-buffers (togl-ptr self))
   
   #+shhh (print-frame-rate self))
 
